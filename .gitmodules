@@ -1,0 +1,3 @@
+[submodule "include/cmajor"]
+	path = include/cmajor
+	url = https://github.com/SoundStacks/cmajor
