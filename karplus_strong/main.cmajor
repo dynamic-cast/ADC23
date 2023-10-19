@@ -63,7 +63,6 @@ processor NoteSelector ()
     event eventIn (std::notes::NoteOn noteOn)
     {
         noteFrequency <- std::notes::noteToFrequency (noteOn.pitch);
-        console <- std::notes::noteToFrequency (noteOn.pitch) <- "\n";
     }
 }
 
