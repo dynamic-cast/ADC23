@@ -1,0 +1,100 @@
+graph Main [[ main ]]
+{
+    input event std::midi::Message midiIn;
+    output stream float out;
+
+    node gate = MidiGate;
+    node noiseSource = std::noise::White;
+    node delay = Delay;
+    node filter = std::filters (float)::tpt::onepole::Processor (0);
+    node gain = std::levels::ConstantGain (float, 0.1f);
+
+    connection
+    {
+        midiIn -> std::midi::MPEConverter -> NoteSelector -> delay.delayLength;
+        midiIn -> std::midi::MPEConverter -> NoteSelector -> gate.gateLength;
+
+        midiIn -> std::midi::MPEConverter -> gate.eventIn;
+        noiseSource.out * gate.out -> delay.in;
+        delay.out -> filter.in;
+        filter.out -> gain -> out;
+
+        midiIn -> std::midi::MPEConverter -> gate.eventIn;
+        noiseSource.out * gate.out -> gain -> out;
+    }
+
+}
+
+processor MidiGate
+{
+    input event (std::notes::NoteOn, std::notes::NoteOff) eventIn;
+    input event float gateLength;
+    output stream float out;
+
+    event eventIn (std::notes::NoteOn e)    { activeNotes++; }
+    event gateLength (float gateLength) {gateDurationInSamples = gateLength;}
+
+    int activeNotes = 0;
+    // int gateDurationInSamples = 44; // Assuming 44.1 kHz sample rate for 1ms
+    float gateDurationInSamples; 
+
+    void main()
+    {
+        loop
+        {
+            if (activeNotes > 0)
+            {
+                out <- 1.0f;
+                gateDurationInSamples--;
+                if (gateDurationInSamples <= 0) {
+                    activeNotes--; // Close the gate after 1ms
+                }
+            }
+            advance();
+        }
+    }
+}
+
+processor NoteSelector ()
+{
+    input event std::notes::NoteOn eventIn;
+    output event float noteFrequency;
+
+    event eventIn (std::notes::NoteOn noteOn)
+    {
+        noteFrequency <- std::notes::noteToFrequency (noteOn.pitch);
+        console <- std::notes::noteToFrequency (noteOn.pitch) <- "\n";
+    }
+}
+
+processor Delay
+{
+    input  stream float in;
+    output stream float out;
+
+    input event float delayLength;
+
+    event delayLength (float delaySamples)
+    {
+        readPos = wrap<maxDelayLength> (writePos - int(processor.frequency/delaySamples));
+    }
+
+    let maxDelayLength = 10000;
+
+    float[maxDelayLength] buffer;
+    wrap<maxDelayLength> readPos, writePos;
+
+    void main()
+    {
+        loop
+        {
+            buffer[writePos] = in + .99f * buffer[readPos];
+            out <- buffer[readPos];
+
+            ++readPos;
+            ++writePos;
+
+            advance();
+        }
+    }
+}
