@@ -7,22 +7,22 @@ graph Main [[ main ]]
     node noiseSource = std::noise::White;
     node delay = Delay;
     node filter = std::filters (float)::tpt::onepole::Processor (0);
+    node lowpass = std::filters(float, float32, 64)::butterworth (2)::Processor(0);
     node gain = std::levels::ConstantGain (float, 0.1f);
 
     connection
     {
-        midiIn -> std::midi::MPEConverter -> NoteSelector -> delay.delayLength;
-        midiIn -> std::midi::MPEConverter -> NoteSelector -> gate.gateLength;
-
+        midiIn -> std::midi::MPEConverter -> NoteSelector -> delay.delayLength, gate.gateLength;
         midiIn -> std::midi::MPEConverter -> gate.eventIn;
+
         noiseSource.out * gate.out -> delay.in;
         delay.out -> filter.in;
         filter.out -> gain -> out;
+        delay.out * 0.09f -> [1] -> delay.in;
 
-        midiIn -> std::midi::MPEConverter -> gate.eventIn;
-        noiseSource.out * gate.out -> gain -> out;
+        noiseSource.out * gate.out -> lowpass.in;
+        lowpass.out -> gain -> out;
     }
-
 }
 
 processor MidiGate
@@ -32,11 +32,11 @@ processor MidiGate
     output stream float out;
 
     event eventIn (std::notes::NoteOn e)    { activeNotes++; }
-    event gateLength (float gateLength) {gateDurationInSamples = gateLength;}
+    event gateLength (float gateLength)     {gateDurationInSamples = gateLength;}
 
     int activeNotes = 0;
-    // int gateDurationInSamples = 44; // Assuming 44.1 kHz sample rate for 1ms
-    float gateDurationInSamples; 
+    // int gateDurationInSamples = processor.frequency / 1000; // Assuming 44.1 kHz sample rate for 1ms
+    float gateDurationInSamples;
 
     void main()
     {
@@ -46,9 +46,7 @@ processor MidiGate
             {
                 out <- 1.0f;
                 gateDurationInSamples--;
-                if (gateDurationInSamples <= 0) {
-                    activeNotes--; // Close the gate after 1ms
-                }
+                if (gateDurationInSamples <= 0) { activeNotes--; } // Close the gate after 1ms
             }
             advance();
         }
@@ -57,12 +55,21 @@ processor MidiGate
 
 processor NoteSelector ()
 {
-    input event std::notes::NoteOn eventIn;
+    input event (std::notes::NoteOn, std::notes::PitchBend) eventIn;
     output event float noteFrequency;
+
+    float notePitch, pitchBend;
 
     event eventIn (std::notes::NoteOn noteOn)
     {
-        noteFrequency <- std::notes::noteToFrequency (noteOn.pitch);
+        notePitch = noteOn.pitch;
+        noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
+    }
+
+    event eventIn (std::notes::PitchBend e)
+    {
+        pitchBend = e.bendSemitones;
+        noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
     }
 }
 
@@ -73,10 +80,7 @@ processor Delay
 
     input event float delayLength;
 
-    event delayLength (float delaySamples)
-    {
-        readPos = wrap<maxDelayLength> (writePos - int(processor.frequency/delaySamples));
-    }
+    event delayLength (float delaySamples)  { readPos = wrap<maxDelayLength> (writePos - int(processor.frequency/delaySamples)); }
 
     let maxDelayLength = 10000;
 
@@ -87,7 +91,7 @@ processor Delay
     {
         loop
         {
-            buffer[writePos] = in + .99f * buffer[readPos];
+            buffer[writePos] = in + 0.9f * buffer[readPos];
             out <- buffer[readPos];
 
             ++readPos;
