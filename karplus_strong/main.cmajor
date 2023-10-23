@@ -3,22 +3,52 @@ graph Main [[ main ]]
     input event std::midi::Message midiIn;
     output stream float out;
 
+    input event float impulseLength [[ name: "length", min: 0.1f, max: 5.0f, init: 1.0f]];
+    input event float feedbackIn [[ name: "feedback", min: 0.1f, max: 0.99f, init: 0.9f]];
+
+    node voices = Voice[8];
+    node voiceAllocator = std::voices::VoiceAllocator(8);
+
+
+    connection
+    {
+        midiIn -> std::midi::MPEConverter -> voiceAllocator;
+
+
+        voiceAllocator.voiceEventOut -> voices.notesIn;
+        feedbackIn ->voices.feedback;
+
+        voices -> out;
+    }
+}
+
+graph Voice 
+{
+    input event (std::notes::NoteOn, std::notes::NoteOff) notesIn;
+    output stream float out;
+
+    input event float impulseLength [[ name: "length", min: 0.1f, max: 5.0f, init: 1.0f]];
+    input event float feedback;
+
     node gate = MidiGate;
     node noiseSource = std::noise::White;
     node delay = Delay;
     node filter = std::filters (float)::tpt::onepole::Processor (0);
     node lowpass = std::filters(float, float32, 64)::butterworth (2)::Processor(0);
     node gain = std::levels::ConstantGain (float, 0.1f);
+    node feedback = std::levels::DynamicGain(float);
 
     connection
     {
-        midiIn -> std::midi::MPEConverter -> NoteSelector -> delay.delayLength, gate.gateLength;
-        midiIn -> std::midi::MPEConverter -> gate.eventIn;
+        notesIn -> NoteSelector -> delay.delayLength, gate.gateLength;
+        notesIn -> gate.eventIn;
+
+        feedback -> feedback.gain;
 
         noiseSource.out * gate.out -> delay.in;
         delay.out -> filter.in;
         filter.out -> gain -> out;
-        delay.out * 0.09f -> [1] -> delay.in;
+        delay.out -> feedback -> [1] -> delay.in;
 
         noiseSource.out * gate.out -> lowpass.in;
         lowpass.out -> gain -> out;
