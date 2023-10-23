@@ -4,8 +4,8 @@ graph Main [[ main ]]
     output stream float out;
 
     input event float impulseLength [[ name: "length", min: 0.1f, max: 5.0f, init: 1.0f]];
-    input event float feedbackIn [[ name: "feedback", min: 0.1f, max: 0.99f, init: 0.9f]];
-
+    input event float feedback [[ name: "feedback", min: 0.93, max: 1, init: 0.99]];
+    input event float filter [[ name: "filter", min: 100, max: 10000, init: 500]];
     node voices = Voice[8];
     node voiceAllocator = std::voices::VoiceAllocator(8);
 
@@ -16,7 +16,10 @@ graph Main [[ main ]]
 
 
         voiceAllocator.voiceEventOut -> voices.notesIn;
-        feedbackIn ->voices.feedback;
+        feedback ->voices.feedbackLevel;
+        impulseLength ->voices.impulseLength;
+        filter -> voices.filterFrequency;
+
 
         voices -> out;
     }
@@ -27,8 +30,9 @@ graph Voice
     input event (std::notes::NoteOn, std::notes::NoteOff) notesIn;
     output stream float out;
 
-    input event float impulseLength [[ name: "length", min: 0.1f, max: 5.0f, init: 1.0f]];
-    input event float feedback;
+    input event float impulseLength ;
+    input event float feedbackLevel ;
+    input event float filterFrequency ; 
 
     node gate = MidiGate;
     node noiseSource = std::noise::White;
@@ -36,19 +40,23 @@ graph Voice
     node filter = std::filters (float)::tpt::onepole::Processor (0);
     node lowpass = std::filters(float, float32, 64)::butterworth (2)::Processor(0);
     node gain = std::levels::ConstantGain (float, 0.1f);
-    node feedback = std::levels::DynamicGain(float);
+    node feedback = Gain();
+
 
     connection
     {
         notesIn -> NoteSelector -> delay.delayLength, gate.gateLength;
         notesIn -> gate.eventIn;
 
-        feedback -> feedback.gain;
+        feedbackLevel  -> feedback.gainIn;
+        impulseLength -> gate.gateMultiplier;
+        filterFrequency -> filter.frequency;
 
         noiseSource.out * gate.out -> delay.in;
         delay.out -> filter.in;
         filter.out -> gain -> out;
-        delay.out -> feedback -> [1] -> delay.in;
+        delay.out -> feedback.in;
+        feedback.out -> [1] -> delay.in;
 
         noiseSource.out * gate.out -> lowpass.in;
         lowpass.out -> gain -> out;
@@ -59,24 +67,27 @@ processor MidiGate
 {
     input event (std::notes::NoteOn, std::notes::NoteOff) eventIn;
     input event float gateLength;
+    input event float gateMultiplier;
     output stream float out;
 
-    event eventIn (std::notes::NoteOn e)    { activeNotes++; }
-    event gateLength (float gateLength)     {gateDurationInSamples = gateLength;}
+    event eventIn (std::notes::NoteOn e)    {openGate=true; }
+    event gateLength (float gateLength)     {gateDurationInSamples = gateLength*gateScale;}
+    event gateMultiplier (float gateMultiplier) {gateScale = gateMultiplier;}
 
-    int activeNotes = 0;
+    bool openGate = false;
     // int gateDurationInSamples = processor.frequency / 1000; // Assuming 44.1 kHz sample rate for 1ms
     float gateDurationInSamples;
+    float gateScale;
 
     void main()
     {
         loop
         {
-            if (activeNotes > 0)
+            if (openGate)
             {
                 out <- 1.0f;
                 gateDurationInSamples--;
-                if (gateDurationInSamples <= 0) { activeNotes--; } // Close the gate after 1ms
+                if (gateDurationInSamples <= 0) { openGate=false; } // Close the gate after 1ms
             }
             advance();
         }
@@ -121,12 +132,32 @@ processor Delay
     {
         loop
         {
-            buffer[writePos] = in + 0.9f * buffer[readPos];
             out <- buffer[readPos];
+            buffer[writePos] = in;
+            
 
             ++readPos;
             ++writePos;
 
+            advance();
+        }
+    }
+}
+
+processor Gain
+{
+    input stream float in;
+    output stream float out;
+    input event float gainIn;
+
+    float gain;
+    event gainIn(float gainIn) {gain = gainIn;}
+
+    void main()
+    {
+        loop
+        {
+            out <- in*gain;
             advance();
         }
     }
