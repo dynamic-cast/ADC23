@@ -4,22 +4,21 @@ graph Main [[ main ]]
     output stream float out;
 
     input event float impulseLength [[ name: "length", min: 0.1f, max: 5.0f, init: 1.0f]];
-    input event float feedback [[ name: "feedback", min: 0.93, max: 1, init: 0.99]];
     input event float filter [[ name: "filter", min: 100, max: 10000, init: 500]];
+
+    input value float feedback [[ name: "feedback", min: 0.80, max: .99, init: 0.99]];
+
     node voices = Voice[8];
     node voiceAllocator = std::voices::VoiceAllocator(8);
-
 
     connection
     {
         midiIn -> std::midi::MPEConverter -> voiceAllocator;
 
-
         voiceAllocator.voiceEventOut -> voices.notesIn;
         feedback ->voices.feedbackLevel;
         impulseLength ->voices.impulseLength;
         filter -> voices.filterFrequency;
-
 
         voices -> out;
     }
@@ -28,11 +27,11 @@ graph Main [[ main ]]
 graph Voice 
 {
     input event (std::notes::NoteOn, std::notes::NoteOff) notesIn;
+    input event float impulseLength;
+    input event float filterFrequency;
     output stream float out;
 
-    input event float impulseLength ;
-    input event float feedbackLevel ;
-    input event float filterFrequency ; 
+    input value float feedbackLevel;
 
     node gate = MidiGate;
     node noiseSource = std::noise::White;
@@ -40,23 +39,19 @@ graph Voice
     node filter = std::filters (float)::tpt::onepole::Processor (0);
     node lowpass = std::filters(float, float32, 64)::butterworth (2)::Processor(0);
     node gain = std::levels::ConstantGain (float, 0.1f);
-    node feedback = Gain();
-
 
     connection
     {
         notesIn -> NoteSelector -> delay.delayLength, gate.gateLength;
         notesIn -> gate.eventIn;
 
-        feedbackLevel  -> feedback.gainIn;
         impulseLength -> gate.gateMultiplier;
         filterFrequency -> filter.frequency;
 
         noiseSource.out * gate.out -> delay.in;
         delay.out -> filter.in;
         filter.out -> gain -> out;
-        delay.out -> feedback.in;
-        feedback.out -> [1] -> delay.in;
+        delay.out * feedbackLevel -> [1] -> delay.in;
 
         noiseSource.out * gate.out -> lowpass.in;
         lowpass.out -> gain -> out;
@@ -70,12 +65,11 @@ processor MidiGate
     input event float gateMultiplier;
     output stream float out;
 
-    event eventIn (std::notes::NoteOn e)    {openGate=true; }
-    event gateLength (float gateLength)     {gateDurationInSamples = gateLength*gateScale;}
-    event gateMultiplier (float gateMultiplier) {gateScale = gateMultiplier;}
+    event eventIn (std::notes::NoteOn e)        { openGate=true; }
+    event gateLength (float gateLength)         { gateDurationInSamples = gateLength*gateScale; }
+    event gateMultiplier (float gateMultiplier) { gateScale = gateMultiplier; }
 
     bool openGate = false;
-    // int gateDurationInSamples = processor.frequency / 1000; // Assuming 44.1 kHz sample rate for 1ms
     float gateDurationInSamples;
     float gateScale;
 
@@ -87,7 +81,7 @@ processor MidiGate
             {
                 out <- 1.0f;
                 gateDurationInSamples--;
-                if (gateDurationInSamples <= 0) { openGate=false; } // Close the gate after 1ms
+                if (gateDurationInSamples <= 0) { openGate=false; }
             }
             advance();
         }
@@ -135,29 +129,9 @@ processor Delay
             out <- buffer[readPos];
             buffer[writePos] = in;
             
-
             ++readPos;
             ++writePos;
 
-            advance();
-        }
-    }
-}
-
-processor Gain
-{
-    input stream float in;
-    output stream float out;
-    input event float gainIn;
-
-    float gain;
-    event gainIn(float gainIn) {gain = gainIn;}
-
-    void main()
-    {
-        loop
-        {
-            out <- in*gain;
             advance();
         }
     }
