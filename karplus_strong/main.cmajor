@@ -16,8 +16,8 @@ graph Main [[ main ]]
         midiIn -> std::midi::MPEConverter -> voiceAllocator;
 
         voiceAllocator.voiceEventOut -> voices.notesIn;
-        feedback ->voices.feedbackLevel;
-        impulseLength ->voices.impulseLength;
+        feedback -> voices.feedbackLevel;
+        impulseLength -> voices.impulseLength;
         filter -> voices.filterFrequency;
 
         voices -> out;
