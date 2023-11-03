@@ -1,4 +1,36 @@
 graph Main [[ main ]]
 {
+    input value float frequency [[ name: "Frequency", min: 5.0f, max: 1000.0f, init: 440.0f ]];
     output stream float out;
+
+    node sine = Sine;
+
+    connection
+    {
+        frequency -> sine.frequency;
+        sine -> out;
+    }
+
+}
+
+processor Sine
+{
+    input value float frequency;
+    output stream float out;
+
+    let volume = 0.15f;
+    float phase;
+
+    void main()
+    {
+        loop
+        {
+            out <- volume * sin (phase);
+
+            let phaseDelta = float (frequency * processor.period * twoPi);
+            phase = addModulo2Pi (phase, phaseDelta);
+
+            advance();
+        }
+    }
 }
