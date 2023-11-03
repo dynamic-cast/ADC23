@@ -1,7 +1,7 @@
 
 {
     "CmajorVersion":    1,
-    "ID":               "com.your_name.your_patch_ID",
+    "ID":               "dev.dynamic-cast.workshops.adc23",
     "version":          "1.0",
     "name":             "main",
     "description":      "A polyphonic Karplus-Strong implementation",
