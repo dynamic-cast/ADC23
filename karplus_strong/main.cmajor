@@ -3,11 +3,12 @@ graph Main [[ main ]]
     input event std::midi::Message midiIn;
     output stream float out;
 
-    input value float feedback [[ name: "feedback", min: 0.80, max: .99, init: 0.99]];
-
     node gate = MidiGate;
     node noiseSource = std::noise::White;
     node delay = Delay;
+    node filter = std::filters (float)::tpt::onepole::Processor (0);
+    node lowpass = std::filters(float, float32, 64)::butterworth (2)::Processor(0);
+    node gain = std::levels::ConstantGain (float, 0.1f);
 
     connection
     {
@@ -15,8 +16,12 @@ graph Main [[ main ]]
         midiIn -> std::midi::MPEConverter -> gate.eventIn;
 
         noiseSource.out * gate.out -> delay.in;
-        delay.out * feedback -> [1] -> delay.in;
-        delay.out -> out;
+        delay.out -> filter.in;
+        filter.out -> gain -> out;
+        delay.out * 0.99f -> [1] -> delay.in;
+
+        noiseSource.out * gate.out -> lowpass.in;
+        lowpass.out -> gain -> out;
     }
 }
 
