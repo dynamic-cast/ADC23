@@ -1,4 +1,68 @@
 graph Main [[ main ]]
 {
+    input event std::midi::Message midiIn;
     output stream float out;
+
+    node gate = MidiGate;
+    node noiseSource = std::noise::White;
+
+    connection
+    {
+        midiIn -> std::midi::MPEConverter -> gate.eventIn;
+        noiseSource.out * gate.out -> out;
+
+        midiIn -> std::midi::MPEConverter -> NoteSelector -> gate.gateLength;
+    }
+}
+
+processor MidiGate
+{
+    input event (std::notes::NoteOn, std::notes::NoteOff) eventIn;
+    input event float gateLength;
+    output stream float out;
+
+    event eventIn (std::notes::NoteOn e)    { activeNotes++; }
+    event gateLength (float gateLength) {gateDurationInSamples = gateLength;}
+
+    int activeNotes = 0;
+    float gateDurationInSamples; 
+
+    void main()
+    {
+        loop
+        {
+            if (activeNotes > 0)
+            {
+                out <- 1.0f;
+                gateDurationInSamples--;
+                if (gateDurationInSamples <= 0)
+                {
+                    activeNotes--;
+                }
+            }
+            advance();
+        }
+    }
+}
+
+processor NoteSelector ()
+{
+    input event (std::notes::NoteOn, std::notes::PitchBend) eventIn;
+    output event float noteFrequency;
+
+    float notePitch, pitchBend;
+
+    event eventIn (std::notes::NoteOn noteOn)
+    {
+        notePitch = noteOn.pitch;
+        noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
+        console <- std::notes::noteToFrequency (notePitch + pitchBend) <- "\n";
+    }
+
+    event eventIn (std::notes::PitchBend e)
+    {
+        pitchBend = e.bendSemitones;
+        noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
+        console <- std::notes::noteToFrequency (notePitch + pitchBend) <- "\n";
+    }
 }
