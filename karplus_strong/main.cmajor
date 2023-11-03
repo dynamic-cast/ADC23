@@ -3,15 +3,20 @@ graph Main [[ main ]]
     input event std::midi::Message midiIn;
     output stream float out;
 
+    input value float feedback [[ name: "feedback", min: 0.80, max: .99, init: 0.99]];
+
     node gate = MidiGate;
     node noiseSource = std::noise::White;
+    node delay = Delay;
 
     connection
     {
+        midiIn -> std::midi::MPEConverter -> NoteSelector -> delay.delayLength, gate.gateLength;
         midiIn -> std::midi::MPEConverter -> gate.eventIn;
-        noiseSource.out * gate.out -> out;
 
-        midiIn -> std::midi::MPEConverter -> NoteSelector;
+        noiseSource.out * gate.out -> delay.in;
+        delay.out * feedback -> [1] -> delay.in;
+        delay.out -> out;
     }
 }
 
@@ -56,13 +61,40 @@ processor NoteSelector ()
     {
         notePitch = noteOn.pitch;
         noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
-        console <- std::notes::noteToFrequency (notePitch + pitchBend) <- "\n";
     }
 
     event eventIn (std::notes::PitchBend e)
     {
         pitchBend = e.bendSemitones;
         noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
-        console <- std::notes::noteToFrequency (notePitch + pitchBend) <- "\n";
+    }
+}
+
+processor Delay
+{
+    input  stream float in;
+    output stream float out;
+
+    input event float delayLength;
+
+    event delayLength (float delaySamples)  { readPos = wrap<maxDelayLength> (writePos - int(processor.frequency / delaySamples)); }
+
+    let maxDelayLength = 10000;
+
+    float[maxDelayLength] buffer;
+    wrap<maxDelayLength> readPos, writePos;
+
+    void main()
+    {
+        loop
+        {
+            out <- buffer[readPos];
+            buffer[writePos] = in;
+
+            ++readPos;
+            ++writePos;
+
+            advance();
+        }
     }
 }
