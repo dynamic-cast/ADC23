@@ -1,4 +1,138 @@
 graph Main [[ main ]]
 {
+    input event std::midi::Message midiIn;
     output stream float out;
+
+    input event float impulseLength [[ name: "length", min: 0.1f, max: 5.0f, init: 1.0f]];
+    input event float filter [[ name: "filter", min: 100, max: 10000, init: 500]];
+
+    input value float feedback [[ name: "feedback", min: 0.80, max: .99, init: 0.99]];
+
+    node voices = Voice[8];
+    node voiceAllocator = std::voices::VoiceAllocator(8);
+
+    connection
+    {
+        midiIn -> std::midi::MPEConverter -> voiceAllocator;
+
+        voiceAllocator.voiceEventOut -> voices.notesIn;
+        feedback -> voices.feedbackLevel;
+        impulseLength -> voices.impulseLength;
+        filter -> voices.filterFrequency;
+
+        voices -> out;
+    }
+}
+
+graph Voice 
+{
+    input event (std::notes::NoteOn, std::notes::NoteOff) notesIn;
+    input event float impulseLength;
+    input event float filterFrequency;
+    output stream float out;
+
+    input value float feedbackLevel;
+
+    node gate = MidiGate;
+    node noiseSource = std::noise::White;
+    node delay = Delay;
+    node filter = std::filters (float)::tpt::onepole::Processor (0);
+    node lowpass = std::filters(float, float32, 64)::butterworth (2)::Processor(0);
+    node gain = std::levels::ConstantGain (float, 0.1f);
+
+    connection
+    {
+        notesIn -> NoteSelector -> delay.delayLength, gate.gateLength;
+        notesIn -> gate.eventIn;
+
+        impulseLength -> gate.gateMultiplier;
+        filterFrequency -> filter.frequency;
+
+        noiseSource.out * gate.out -> delay.in;
+        delay.out -> filter.in;
+        filter.out -> gain -> out;
+        delay.out * feedbackLevel -> [1] -> delay.in;
+
+        noiseSource.out * gate.out -> lowpass.in;
+        lowpass.out -> gain -> out;
+    }
+}
+
+processor MidiGate
+{
+    input event (std::notes::NoteOn, std::notes::NoteOff) eventIn;
+    input event float gateLength;
+    input event float gateMultiplier;
+    output stream float out;
+
+    event eventIn (std::notes::NoteOn e)        { openGate=true; }
+    event gateLength (float gateLength)         { gateDurationInSamples = gateLength*gateScale; }
+    event gateMultiplier (float gateMultiplier) { gateScale = gateMultiplier; }
+
+    bool openGate = false;
+    float gateDurationInSamples;
+    float gateScale;
+
+    void main()
+    {
+        loop
+        {
+            if (openGate)
+            {
+                out <- 1.0f;
+                gateDurationInSamples--;
+                if (gateDurationInSamples <= 0) { openGate=false; }
+            }
+            advance();
+        }
+    }
+}
+
+processor NoteSelector ()
+{
+    input event (std::notes::NoteOn, std::notes::PitchBend) eventIn;
+    output event float noteFrequency;
+
+    float notePitch, pitchBend;
+
+    event eventIn (std::notes::NoteOn noteOn)
+    {
+        notePitch = noteOn.pitch;
+        noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
+    }
+
+    event eventIn (std::notes::PitchBend e)
+    {
+        pitchBend = e.bendSemitones;
+        noteFrequency <- std::notes::noteToFrequency (notePitch + pitchBend);
+    }
+}
+
+processor Delay
+{
+    input  stream float in;
+    output stream float out;
+
+    input event float delayLength;
+
+    event delayLength (float delaySamples)  { readPos = wrap<maxDelayLength> (writePos - int(processor.frequency/delaySamples)); }
+
+    let maxDelayLength = 10000;
+
+    float[maxDelayLength] buffer;
+    wrap<maxDelayLength> readPos, writePos;
+
+    void main()
+    {
+        loop
+        {
+            out <- buffer[readPos];
+            buffer[writePos] = in;
+            
+            ++readPos;
+            ++writePos;
+
+            advance();
+        }
+    }
 }
