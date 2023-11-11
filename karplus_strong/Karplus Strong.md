@@ -1,24 +1,14 @@
 # Karplus-Strong Synthesis
 
-The Karplus-Strong synthesis algorithm is a method for generating realistic plucked string instrument sounds, such as those produced by guitars, banjos, and other similar instruments. It was developed by Kevin Karplus and Alex Strong in the 1980s. By taking a noise source and subtracting frequencies to create a new tone, this algorithm is an example of subtractive synthesis.
+The Karplus-Strong synthesis algorithm is a method for generating realistic plucked string instrument sounds, such as those produced by guitars, banjos, and other similar instruments. It was developed by Kevin Karplus and Alex Strong in the 1980s. By emulating the physical properties of a plucked instrument, this algorithm is an example of physical modelling synthesis.
 
-## Subtractive Synthesis
+## Physical Modelling Synthesis
 
-Subtractive synthesis is a sound synthesis method that involves creating sounds by starting with complex waveforms and then subtracting or filtering out certain harmonic components to achieve the desired sound. This process typically begins with a rich and harmonically complex waveform and progressively removes or attenuates specific frequency components through various filters and signal processing techniques. The resulting sound is a simpler and more focused waveform.
+The process involves creating a mathematical model that represents the physical attributes of an instrument, such as the shape and material of its components, the way it produces sound, and how that sound interacts with the environment. This model is then used to simulate the behavior of the instrument in a virtual environment, allowing for the synthesis of realistic and expressive sounds.
 
-Basic Overview:
+When a string is plucked, it is initially held to one side. Once it is let go, the string will vibrate freely to feed energy into the body of the instrument.
 
-* Oscillator: Subtractive synthesis often begins with an oscillator generating a harmonically rich waveform, such as a sawtooth, square, or triangle wave. These waveforms contain a wide range of harmonic frequencies.
-
-* Filtering: Filters are a central element in subtractive synthesis. Low-pass, high-pass, band-pass, and notch filters are commonly used. A low-pass filter, for example, allows frequencies below a certain cutoff point to pass through while attenuating frequencies above that point. By adjusting the filter settings, you can shape the sound by removing or emphasizing specific frequency ranges.
-
-* Amplitude Shaping: Envelopes are used to control the amplitude (loudness) of the sound over time. Common envelope stages include Attack, Decay, Sustain, and Release (ADSR). These stages allow you to shape how the sound evolves from the moment it's triggered until it fades out.
-
-* Modulation: Subtractive synthesis often includes modulation sources, such as LFOs (Low-Frequency Oscillators), which can be used to modulate parameters like filter cutoff frequency, oscillator pitch, and more. Modulation adds movement and complexity to the sound.
-
-* Effects: Additional effects like reverb, delay, chorus, and distortion can be applied to further shape and enhance the sound.
-
-Subtractive synthesis is a flexible and widely used technique in electronic music production. It allows synthesists to create a wide variety of sounds, from rich, evolving pads to sharp, percussive leads, by sculpting the harmonic content of the initial waveform and modulating various parameters.
+![Instrument Body with String Diagram](physical-modelling.png)
 
 ## Karplus-Strong: Deepdive
 
