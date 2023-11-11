@@ -1,0 +1,11 @@
+## testFunction()
+
+bool testVectorAdd()
+{
+    int<4> f = (1, 2, 3, 4);
+    let g = f + f;
+
+    return allTrue (g == int<4> (2, 4, 6, 8));
+}
+
+## runScript ({ frequency:44100, blockSize:32, samplesToRender:44100, subDir:"test1", patch: "../karplus_strong/main.cmajorpatch" })
