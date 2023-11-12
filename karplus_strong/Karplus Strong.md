@@ -20,15 +20,13 @@ The diagram above highlights the main points to the Karplus-Strong synthesis mod
 
 A basic overview of this algorithm:
 
-* Initialization: Start with a buffer (array) of audio samples, which represents the sound waveform. The length of the buffer determines the fundamental frequency (pitch) of the simulated string.
-
-* Random Noise: Fill the buffer with random noise. This noise serves as the initial excitation for the virtual string. In this example, we fill the buffer using a 1 m/s noise gate.
+* Random Noise: Fill the buffer with random noise. This noise serves as the initial excitation for the virtual string. In this example, we fill the buffer using a noise gate. The length of the gate is determined by the frequency of the note pressed.
 
 * Filtering: Apply a simple low-pass filter to the noise signal. The filter attenuates higher frequencies and emphasizes the fundamental frequency of the string. This filter models the dampening of high-frequency components as the string vibrates.
 
-* Feedback Loop: Create a feedback loop by continuously processing the buffer. At each time step, you compute a new sample by averaging two previous samples and feeding them back into the buffer. This mimics the vibration of a plucked string, where energy travels back and forth along the string.
+* Feedback Loop: Create a feedback loop by continuously processing the buffer. This mimics the vibration of a plucked string, where energy travels back and forth along the string. The length of the feedback loop is determined by the frequency of the note pressed.
 
-* Pitch Control: By adjusting the delay length in the feedback loop, you can control the pitch of the generated sound. Longer delays produce lower pitches, while shorter delays create higher pitches.
+* Pitch Control: By adjusting the delay length in the feedback loop, you can control the pitch of the generated sound. Longer delays produce higher pitches, while shorter delays create lower pitches.
 
 * Output: The generated samples from the buffer are used as the output audio signal. By continuously updating the buffer with the feedback loop, the algorithm simulates the sustained sound of a vibrating string.
 
