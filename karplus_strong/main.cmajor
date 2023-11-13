@@ -8,7 +8,7 @@ graph Main [[ main ]]
     node delay = Delay;
     node filter = std::filters (float)::tpt::onepole::Processor (0);
     node lowpass = std::filters(float, float32, 64)::butterworth (2)::Processor(0);
-    node gain = std::levels::ConstantGain (float, 0.1f);
+    node gain = std::levels::ConstantGain (float, 0.9f);
 
     connection
     {
